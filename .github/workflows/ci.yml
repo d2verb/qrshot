@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# 同じブランチで新しい push があったら、走っている古い実行は止める。
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    # qrshot は macOS 15 以上が必要（Swift ネイティブの Vision API を使うため）。
+    # macos-latest は時期によって指す実体が変わるので明示的に固定する。
+    runs-on: macos-15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # 失敗したときに「コードが悪いのか環境が違うのか」を切り分けられるように、
+      # 何より先にツールチェインを出しておく。
+      - name: ツールチェインを表示
+        run: |
+          swift --version
+          xcodebuild -version
+
+      - name: ビルド
+        run: swift build
+
+      - name: テスト
+        run: swift test
+
+      # 人間を必要としない CLI の経路はここで確認できる。
+      # 領域選択が始まる経路（引数なしの実行）は絶対に走らせないこと。
+      - name: CLI の引数まわりを確認
+        run: |
+          set -uo pipefail
+
+          BIN=".build/debug/qrshot"
+
+          # 非ゼロ終了を期待する検査があるので set -e は使えない。
+          # 代わりに失敗を数え、最後にまとめて落とす。
+          # （set -e に頼ると、検査が失敗しても最後のコマンドが成功していれば
+          #  ジョブが緑になってしまう。）
+          failures=0
+
+          # コマンドを実行して終了コードだけを返す。
+          status_of() {
+            "$@" > /dev/null 2>&1
+            echo $?
+          }
+
+          expect_status() {
+            local expected="$1"; shift
+            local label="$1"; shift
+            local actual
+            actual="$(status_of "$@")"
+            if [ "$actual" -ne "$expected" ]; then
+              echo "::error::${label}: exit code は ${expected} を期待しましたが ${actual} でした"
+              failures=$((failures + 1))
+              return
+            fi
+            echo "OK  ${label} (exit ${actual})"
+          }
+
+          echo "--- 出力の目視 ---"
+          "$BIN" --version
+          "$BIN" --help
+
+          echo "--- 終了コード ---"
+          expect_status 0 "--version" "$BIN" --version
+          expect_status 0 "--help" "$BIN" --help
+          expect_status 0 "-h" "$BIN" -h
+          expect_status 2 "不明な引数" "$BIN" --bogus
+
+          # PATH を空にして実行する。terminal-notifier の事前チェックで落ちるので
+          # 画面は奪われない。ここでハングするなら事前チェックの順序が壊れている。
+          expect_status 2 "terminal-notifier 不在" env PATH= "$BIN"
+
+          if [ "$failures" -ne 0 ]; then
+            echo "::error::${failures} 件の検査が失敗しました"
+            exit 1
+          fi
+          echo "すべての検査に合格しました"

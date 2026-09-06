@@ -1,2 +1,7 @@
 .build/
 .swiftpm/
+
+# リリース用のパッケージング成果物（ローカルで release workflow を試したとき用）
+dist/
+*.tar.gz
+*.tar.gz.sha256

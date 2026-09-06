@@ -1,0 +1,81 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+# GitHub Release を作るために必要。組み込みの GITHUB_TOKEN で足りるので
+# 第三者製の Action は使わない。
+permissions:
+  contents: write
+
+jobs:
+  release:
+    # CI と同じ理由で macos-latest ではなく固定する。
+    runs-on: macos-15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ツールチェインを表示
+        run: |
+          swift --version
+          xcodebuild -version
+
+      # 壊れたものをリリースしないよう、パッケージングの前にテストを通す。
+      - name: テスト
+        run: swift test
+
+      - name: universal binary をビルドして固める
+        run: |
+          set -euo pipefail
+
+          swift build -c release --arch arm64 --arch x86_64
+
+          # 複数アーキテクチャ指定時の出力先は単一アーキテクチャのときと違うので、
+          # ハードコードせず SwiftPM に聞く。
+          BIN_DIR="$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)"
+          BIN="$BIN_DIR/qrshot"
+
+          echo "--- アーキテクチャ ---"
+          lipo -info "$BIN"
+          # 片方しか入っていない成果物を配らないための検査。
+          for arch in arm64 x86_64; do
+            if ! lipo -archs "$BIN" | tr ' ' '\n' | grep -qx "$arch"; then
+              echo "::error::$arch が成果物に含まれていません"
+              exit 1
+            fi
+          done
+
+          # タグとバイナリが名乗るバージョンの食い違いを、配る前に止める。
+          EXPECTED="${GITHUB_REF_NAME#v}"
+          ACTUAL="$("$BIN" --version | awk '{print $2}')"
+          if [ "$EXPECTED" != "$ACTUAL" ]; then
+            echo "::error::タグ ${GITHUB_REF_NAME} に対して qrshot --version は ${ACTUAL} を返しました。main.swift の version を更新してください。"
+            exit 1
+          fi
+          echo "バージョン一致: $ACTUAL"
+
+          NAME="qrshot-${GITHUB_REF_NAME}-macos-universal"
+          mkdir -p "dist/$NAME"
+          cp "$BIN" "dist/$NAME/qrshot"
+          cp README.md "dist/$NAME/README.md"
+          tar -czf "$NAME.tar.gz" -C dist "$NAME"
+
+          # Homebrew の formula にそのまま貼れるよう、tarball 名だけの相対パスで出す。
+          shasum -a 256 "$NAME.tar.gz" > "$NAME.tar.gz.sha256"
+          cat "$NAME.tar.gz.sha256"
+
+          echo "ASSET_TARBALL=$NAME.tar.gz" >> "$GITHUB_ENV"
+          echo "ASSET_SHA=$NAME.tar.gz.sha256" >> "$GITHUB_ENV"
+
+      - name: GitHub Release を作る
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            "$ASSET_TARBALL" \
+            "$ASSET_SHA"
