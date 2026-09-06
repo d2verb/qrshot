@@ -5,7 +5,7 @@ public protocol Clipboard {
     func copy(_ text: String) throws
 }
 
-public enum ClipboardError: Error, CustomStringConvertible {
+public enum ClipboardError: Error, Equatable, CustomStringConvertible {
     case writeFailed
 
     public var description: String {

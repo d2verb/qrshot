@@ -17,7 +17,7 @@ public protocol Notifier {
     func notify(_ outcome: NotificationOutcome) throws
 }
 
-public enum NotifierError: Error, CustomStringConvertible {
+public enum NotifierError: Error, Equatable, CustomStringConvertible {
     case launchFailed(String)
     case exitedNonZero(Int32)
 
@@ -49,8 +49,9 @@ public struct TerminalNotifier: Notifier {
         path: String = ProcessInfo.processInfo.environment["PATH"] ?? ""
     ) -> TerminalNotifier? {
         // `split` は空要素（"/a::/b" や末尾の ":"）を落とすため、POSIX と違って
-        // 空の PATH 要素をカレントディレクトリとして扱わない。これは意図的で、
-        // 外部バイナリをカレントディレクトリから黙って拾うのは危険なため。
+        // 空の PATH 要素をカレントディレクトリとして扱わない。ただし "." のような
+        // 明示的な相対パスはそのまま候補になり、`URL(fileURLWithPath:)` がそれを
+        // カレントディレクトリ基準で解決する。
         for directory in path.split(separator: ":") {
             let candidate = URL(fileURLWithPath: String(directory))
                 .appendingPathComponent("terminal-notifier")

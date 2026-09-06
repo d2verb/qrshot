@@ -34,6 +34,8 @@ public struct InteractiveScreenCapturer: ScreenCapturer {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
         process.arguments = ["-i", url.path]
+        // standardError を設定しない: Process はデフォルトで親の stderr を継承するため、
+        // screencapture が画面収録権限などについて出す出力がそのままユーザーに届く。
         do {
             try process.run()
         } catch {

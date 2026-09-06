@@ -9,7 +9,7 @@ import Testing
 // 全部通ってしまう。このスイートは `any Error` として補間したときに
 // 人間が読める日本語文になることを固定し、適合が外れて生の enum 表現
 //（例: `exitedNonZero(1)`）がユーザーに見えてしまう退行を検知する。
-@Suite("エラーメッセージの CustomStringConvertible")
+@Suite("CustomStringConvertible")
 struct ErrorMessageTests {
     @Test("ScreenCaptureError は any Error として補間しても読める文言になる")
     func screenCaptureErrorDescribesReadably() {

@@ -1,16 +1,15 @@
 import CoreGraphics
-import Foundation
 
 @testable import QRShotKit
 
-struct FakeError: Error, Equatable {
+struct FakeError: Error {
     let message: String
 }
 
 // Fake のスタイル分け:
-// - `Stub*` は構築時に振る舞いを固定する（`init(..., error:)`）。
-// - `Spy*` は呼び出された事実を記録し、失敗させたい場合は構築後に
-//   `var failure: (any Error)?` を書き換える。
+// - `Stub*` と `Spy*` はどちらも呼び出された事実を記録する（`callCount` など）。
+// - 違いは失敗をいつ設定するか: `Stub*` は構築時に固定する（`init(..., error:)`）、
+//   `Spy*` は構築後に `var failure: (any Error)?` を書き換えて差し込む。
 
 final class StubScreenCapturer: ScreenCapturer {
     private let image: CGImage?

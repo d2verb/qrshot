@@ -4,7 +4,7 @@ import Testing
 @testable import QRShotKit
 
 @Suite("TerminalNotifier.locate")
-struct TerminalNotifierLocateTests {
+struct TerminalNotifierTests {
     /// PATH の 1 要素として使える一時ディレクトリを作る。
     /// `executable` が true のとき、その中に実行可能な terminal-notifier を置く。
     private func makeDirectory(containingExecutable executable: Bool) throws -> URL {
