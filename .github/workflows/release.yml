@@ -69,13 +69,27 @@ jobs:
           echo "ASSET_TARBALL=$NAME.tar.gz" >> "$GITHUB_ENV"
           echo "ASSET_SHA=$NAME.tar.gz.sha256" >> "$GITHUB_ENV"
 
-      - name: GitHub Release を作る
+      - name: GitHub Release に成果物を載せる
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh release create "$GITHUB_REF_NAME" \
-            --title "$GITHUB_REF_NAME" \
-            --generate-notes \
-            "$ASSET_TARBALL" \
-            "$ASSET_SHA"
+
+          # タグの作られ方は 2 通りある。
+          #   1. GitHub の UI でリリースを作る → リリースが先に存在する
+          #   2. git push origin <tag> → リリースはまだ無い
+          # gh release create は 1 の場合に必ず失敗するので、既存を見てから分岐する。
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            echo "リリース ${GITHUB_REF_NAME} は既にあるので、成果物だけ載せる"
+            gh release upload "$GITHUB_REF_NAME" \
+              "$ASSET_TARBALL" \
+              "$ASSET_SHA" \
+              --clobber
+          else
+            echo "リリース ${GITHUB_REF_NAME} を新規作成する"
+            gh release create "$GITHUB_REF_NAME" \
+              --title "$GITHUB_REF_NAME" \
+              --generate-notes \
+              "$ASSET_TARBALL" \
+              "$ASSET_SHA"
+          fi
