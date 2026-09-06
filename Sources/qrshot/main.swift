@@ -6,16 +6,16 @@ let usage = """
     qrshot - 画面の領域を選択して、写っている QR コードをクリップボードへコピーします
 
     使い方:
-      qrshot            領域選択を開始する
-      qrshot --help     このヘルプを表示する
-      qrshot --version  バージョンを表示する
+      qrshot                領域選択を開始する
+      qrshot --help, -h     このヘルプを表示する
+      qrshot --version      バージョンを表示する
 
     実行には terminal-notifier が必要です:
       brew install terminal-notifier
     """
 
 func printToStandardError(_ message: String) {
-    FileHandle.standardError.write(Data((message + "\n").utf8))
+    fputs(message + "\n", stderr)
 }
 
 func fail(_ message: String) -> Never {
