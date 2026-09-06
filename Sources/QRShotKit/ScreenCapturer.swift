@@ -8,7 +8,7 @@ public protocol ScreenCapturer {
     func capture() throws -> CGImage?
 }
 
-public enum ScreenCaptureError: Error, CustomStringConvertible {
+public enum ScreenCaptureError: Error, Equatable, CustomStringConvertible {
     case launchFailed(String)
     case unreadableImage
 

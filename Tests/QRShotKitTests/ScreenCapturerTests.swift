@@ -41,6 +41,10 @@ struct ScreenCapturerTests {
         let loaded = try InteractiveScreenCapturer.loadImage(at: url)
 
         try FileManager.default.removeItem(at: url)
+        // 削除がデコードの「前」に起きていること自体がこのテストの本体。
+        // この行を消して並べ替えると、テストは名前とコメントを保ったまま
+        // 何も検証しなくなる。
+        #expect(!FileManager.default.fileExists(atPath: url.path))
 
         let decoded = try await VisionQRDecoder().decode(loaded)
         #expect(decoded?.payload == "regression test")
@@ -53,7 +57,23 @@ struct ScreenCapturerTests {
         defer { try? FileManager.default.removeItem(at: url) }
         try Data("これは画像ではありません".utf8).write(to: url)
 
-        #expect(throws: ScreenCaptureError.self) {
+        #expect(throws: ScreenCaptureError.unreadableImage) {
+            try InteractiveScreenCapturer.loadImage(at: url)
+        }
+    }
+
+    // screencapture が書き込み途中で死ぬと空ファイルが残りうる。
+    // ちなみに「途中まで書かれた PNG」はここに来ない。ImageIO は欠損行を
+    // 埋めた原寸画像を返してしまうので、その場合はデコード側の nil 経路
+    //（QR が見つからない）で処理されることになる。
+    @Test("空ファイルは unreadableImage を投げる")
+    func throwsForEmptyFile() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("qrshot-test-\(UUID().uuidString).png")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try Data().write(to: url)
+
+        #expect(throws: ScreenCaptureError.unreadableImage) {
             try InteractiveScreenCapturer.loadImage(at: url)
         }
     }
@@ -63,7 +83,7 @@ struct ScreenCapturerTests {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("qrshot-test-does-not-exist-\(UUID().uuidString).png")
 
-        #expect(throws: ScreenCaptureError.self) {
+        #expect(throws: ScreenCaptureError.unreadableImage) {
             try InteractiveScreenCapturer.loadImage(at: url)
         }
     }
