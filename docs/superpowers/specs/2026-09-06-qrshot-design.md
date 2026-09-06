@@ -123,9 +123,13 @@ Tests/
 - `PasteboardClipboard`: `NSPasteboard.withUniqueName()` を注入し、ユーザーの実クリップボードを壊さずに書き込みと読み返しを検証する
   - 前の内容の別形式（HTML など）が残らないこと。`clearContents` を省くと、リッチテキストをコピーした直後の実行で古い内容が貼られてしまう
 
+### テスト実行上の注意
+
+`NSPasteboard` は並行アクセスに耐えない。名前の違うペーストボードを使っていても AppKit 内部の共有状態でレースし、`stringForType:` が `objc_msgSend` で不正ポインタ参照を起こしてテストプロセスごと落ちる（スイート全体の並行実行で約 10%、実測）。`PasteboardClipboard` のスイートには `.serialized` を付けて直列化する。製品コードは `NSPasteboard.general` を 1 回触るだけなので、これはテスト固有の問題であり製品の欠陥ではない。
+
 ### 自動テストしない
 
-- `InteractiveScreenCapturer` と `TerminalNotifier`: どちらも人間の操作か通知センターの目視が要る。README に手動確認手順を残す
+- `InteractiveScreenCapturer` と `TerminalNotifier.notify`: どちらも人間の操作か通知センターの目視が要る。README に手動確認手順を残す
 - 傾き・低コントラスト・小さい QR の検出精度: Vision の担当範囲であり、他人の実装を測ることになるため
 
 ## 依存
