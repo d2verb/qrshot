@@ -9,7 +9,9 @@ public enum ClipboardError: Error, CustomStringConvertible {
     case writeFailed
 
     public var description: String {
-        "クリップボードに書き込めませんでした"
+        switch self {
+        case .writeFailed: "クリップボードに書き込めませんでした"
+        }
     }
 }
 

@@ -26,4 +26,21 @@ struct PasteboardClipboardTests {
 
         #expect(pasteboard.string(forType: .string) == "あと")
     }
+
+    // 上の 2 件は setString しか固定しない（clearContents を消しても通る）。
+    // clearContents が守っているのは、前の内容の別形式が残ってしまうケース。
+    // リッチテキストをコピーした直後に qrshot を使うと、Mail や Notes は
+    // 古い HTML のほうを優先して貼り付けてしまう。
+    @Test("先にあった別形式の内容は残らない")
+    func clearsStaleRepresentations() throws {
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
+        pasteboard.clearContents()
+        _ = pasteboard.setString("<b>ふるい HTML</b>", forType: .html)
+
+        try PasteboardClipboard(pasteboard: pasteboard).copy("あたらしい")
+
+        #expect(pasteboard.string(forType: .string) == "あたらしい")
+        #expect(pasteboard.string(forType: .html) == nil)
+    }
 }
