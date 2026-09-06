@@ -10,7 +10,7 @@
 
 対象:
 
-- 引数なしの単一コマンド `qrshot`（`--help` / `--version` のみ受け付ける）
+- 引数なしの単一コマンド `qrshot`（`--help` / `-h` / `--version` のみ受け付ける）
 - 領域選択によるスクリーンショット取得
 - QR コードのデコードとクリップボードへのコピー
 - 成功・失敗の通知
@@ -38,9 +38,9 @@ Esc でキャンセルしたときの `screencapture` の終了コードは macO
 
 ### 複数検出時
 
-検出結果を `boundingBox` の面積降順に並べ、`payloadStringValue` が取れる最初のものを採用する。領域を自分で囲んでいる以上、狙いはその中で一番大きく写っている QR である可能性が高い。2 個以上検出した場合は stderr に一行注記を出す。この件数は読み取れなかった QR も含むため、注記は「読み取れたうち一番大きいものを使った」と書く。
+検出結果を `boundingBox` の面積降順に並べ、`payloadString` が取れる最初のものを採用する。領域を自分で囲んでいる以上、狙いはその中で一番大きく写っている QR である可能性が高い。2 個以上検出した場合は stderr に一行注記を出す。この件数は読み取れなかった QR も含むため、注記は「読み取れたうち一番大きいものを使った」と書く。
 
-`payloadStringValue` が `nil` のもの（バイナリペイロードの QR）は文字列化できないため読み取り不能として扱い、次の候補へ進む。
+`payloadString` が `nil` のもの（バイナリペイロードの QR）は文字列化できないため読み取り不能として扱い、次の候補へ進む。
 
 `boundingBox` は 4 隅から計算される軸平行の外接矩形であり、QR 本体の四角形の面積そのものではない。大きく傾いた QR では、真の面積が小さいほうが外接矩形では勝つことがある。画面上の QR はほぼ軸平行なので実害はないと判断し、四角形の面積を計算し直すことはしない。
 
@@ -61,7 +61,7 @@ Esc でキャンセルしたときの `screencapture` の終了コードは macO
 |---|---|---|---|
 | 不明な引数 | なし | 不明な引数と usage | 2 |
 | QR 読み取り成功 | 成功メッセージ | — | 0 |
-| QR 複数検出 → 最大を採用 | 成功メッセージ | `N 個検出したので、読み取れたうち一番大きいものを使いました` | 0 |
+| QR 複数検出 → 最大を採用 | 成功メッセージ | `QR コードを N 個検出したので、読み取れたうち一番大きいものを使いました` | 0 |
 | Esc でキャンセル | なし | — | 0 |
 | QR が無い / 読めない | 失敗メッセージ | — | 1 |
 | `terminal-notifier` が無い | 出せない | インストール案内 | 2 |
@@ -74,6 +74,8 @@ Esc でキャンセルしたときの `screencapture` の終了コードは macO
 
 読み取り成功後に `terminal-notifier` が失敗した場合も上の行が当てはまる。つまりクリップボードへのコピーはすでに完了しているにもかかわらず exit 2 になる。これは意図的な挙動で、通知が飛ばない broken な環境を静かに exit 0 で隠さず、stderr でユーザーに伝えるためである。
 
+クリップボード書き込みの失敗（`ClipboardError.writeFailed`）と、デコーダが例外を投げた場合も、通知を一切出さずに stderr と exit 2 だけで終わる。これも意図的な判断である。既存の `.failure` 通知をここで流用すると「QRコードが存在しないまたは読み取れない状態にあります」と表示することになるが、これらの経路では QR の読み取り自体は成功しているため、その文言は嘘になる。正しく伝えるには通知メッセージの語彙を増やして 3 番目の文言を作る必要があり、成功・失敗の 2 つに絞った設計時の語彙を超えてしまう。そのため、この経路の失敗は stderr に委ね、通知は出さないことにした。なお `NSPasteboard.setString` を `.string` で使う経路に実践的な失敗モードはほとんど無い。想定しうる 6 通りの失敗候補を検証したところ、いずれも成功（`true`）を返しており、この経路の到達可能性は低いと判断している。
+
 `不明な引数` は環境エラーではなく usage エラーだが、exit 2 は Unix の慣習として usage エラーにも使われるため、他の exit 2 の行と同じ扱いでコードも表もそのままにしている。
 
 Vision の `VisionError` は `LocalizedError` に適合するが `CustomStringConvertible` には適合しない。そのため、もしこれが `catch { fail("\(error)") }` まで到達すると、`"\(error)"` はローカライズされた文言ではなく `invalidImage("bad image data")` のような enum の生表現を出力する。実際には、1×1 から 16×16、1×400、400×1 まで人工的に縮退させた画像で `DetectBarcodesRequest` を試したところ、例外を投げず観測結果 0 件を返すだけだった。つまり「選択範囲が数ピクセルしかない」という現実的なケースは `.notFound`（exit 1）に落ちるのであって、この catch 節には来ない。この経路は到達可能性が低いと判断し、意図的に特別扱いしていない。
@@ -85,6 +87,8 @@ Vision の `VisionError` は `LocalizedError` に適合するが `CustomStringCo
 同じ「ファイルが無い」状態は、`$TMPDIR` が壊れている・ディスクが一杯・`screencapture` がシグナルで死んだ場合にも起きる。いずれもキャンセルとして静かに exit 0 になる。終了コードで判別しようとしても、Esc 時の終了コードが macOS のバージョンで揺れる以上、非ゼロを一律にエラーとは扱えない。事前に一時ディレクトリの書き込み可否を検査する案もあるが、そこが壊れている環境では他も壊れているため、検査は入れない。
 
 なお、書き込み途中で切れた PNG はここには来ない。ImageIO は欠損行を埋めた原寸画像を返すため、デコード側で「QR が見つからない」として exit 1 になる。`unreadableImage` に実際に到達するのは、空またはヘッダだけのファイルの場合。
+
+`brew install terminal-notifier` した直後は、通知権限がまだ許可されていないことがある。この状態では `notify` が終了コード 3 で失敗し、`NotifierError.exitedNonZero(3)` が `main.swift` の `catch` まで伝播して exit 2 になる。この時点でクリップボードへのコピーはすでに成功しているため、実害は通知が出ないことと、読み取りに成功しているのに exit 2 に見えることだけである。「システム設定 > 通知 > terminal-notifier」で許可すれば解消する。README の「必要なもの」に手順を記載した。
 
 ## アーキテクチャ
 
@@ -125,20 +129,39 @@ Tests/
 
 ### 自動テストする
 
-- `VisionQRDecoder`: `CIFilter.qrCodeGenerator` でテスト内に QR 画像を生成してデコードする。フィクスチャ画像をリポジトリに置かずに済む
-  - ASCII / 日本語 / URL が往復すること
-  - 大小 2 つの QR を 1 枚に合成し、大きいほうの中身が返ること
+`swift test` は現在 32 tests / 6 suites。以下はその内訳。
+
+- `VisionQRDecoder`（8 tests）: `CIFilter.qrCodeGenerator` でテスト内に QR 画像を生成してデコードする。フィクスチャ画像をリポジトリに置かずに済む
+  - ASCII / 日本語 / URL が往復すること（3 tests）
+  - 大小 2 つの QR を 1 枚に合成し、大きいほうの中身と `detectedCount` が返ること
+  - QR が 1 つだけのとき `detectedCount` が 1 であること
   - QR の無い単色画像で `nil` が返ること
-  - バイナリペイロードの QR（`payloadStringValue` が `nil`）だけの画像で `nil` が返ること
+  - バイナリペイロードの QR（`payloadString` が `nil`）だけの画像で `nil` が返ること
   - バイナリペイロードの QR のほうが大きくても、読み取れる次の候補が採用されること
-- `QRShot`: fake の Capturer / Decoder / Clipboard / Notifier を注入して経路を確認
+- `QRShot`（8 tests）: fake の Capturer / Decoder / Clipboard / Notifier を注入して経路を確認
   - キャンセル時、クリップボードにも通知にも一切触らない
   - 成功時、コピーが 1 回・成功通知が 1 回
   - デコード失敗時、コピーは 0 回・失敗通知が 1 回
-- `InteractiveScreenCapturer.loadImage`: PNG を読み込んだ後に元ファイルを消しても、その `CGImage` からデコードできること
-  - `CGImageSourceCreateWithURL` が返す `CGImage` は画素をファイルから遅延読み込みする。`capture()` は一時ファイルを `defer` で消してから画像を返すため、素朴に書くと QR が写っていても必ず読み取り失敗になる。先に `Data` へ読み切ってファイルの寿命から切り離す
-- `PasteboardClipboard`: `NSPasteboard.withUniqueName()` を注入し、ユーザーの実クリップボードを壊さずに書き込みと読み返しを検証する
+  - クリップボード書き込みが失敗したら成功通知を出さない
+  - キャプチャの失敗は「キャンセル」に丸めず伝播する
+  - デコードの失敗は「見つからない」に丸めず伝播する
+  - 成功通知が失敗しても、クリップボードへの書き込みそのものは残る
+  - 失敗通知が失敗した場合も伝播する
+- `InteractiveScreenCapturer`（4 tests、対象は `loadImage`）
+  - PNG を読み込んだ後に元ファイルを消しても、その `CGImage` からデコードできること。`CGImageSourceCreateWithURL` が返す `CGImage` は画素をファイルから遅延読み込みする。`capture()` は一時ファイルを `defer` で消してから画像を返すため、素朴に書くと QR が写っていても必ず読み取り失敗になる。先に `Data` へ読み切ってファイルの寿命から切り離す
+  - 画像ではないファイル / 空ファイル / 存在しないパスのそれぞれで `unreadableImage` を投げること
+- `PasteboardClipboard`（3 tests）: `NSPasteboard.withUniqueName()` を注入し、ユーザーの実クリップボードを壊さずに書き込みと読み返しを検証する
+  - 書き込んだ文字列が読み返せること
+  - 2 回書き込むと後のものだけが残ること
   - 前の内容の別形式（HTML など）が残らないこと。`clearContents` を省くと、リッチテキストをコピーした直後の実行で古い内容が貼られてしまう
+- `TerminalNotifier.locate`（6 tests）: `terminal-notifier` 本体は起動せず、PATH 探索だけを検証する
+  - PATH 上に実行可能な `terminal-notifier` があれば見つかる
+  - PATH 上に無ければ `nil`
+  - PATH が空文字列なら `nil`
+  - PATH の後ろのディレクトリにあっても見つかる
+  - 実行権限のないファイルは無視する
+  - 実行ファイルと同名のディレクトリは無視する
+- `CustomStringConvertible`（3 tests、`ErrorMessageTests.swift`）: `ScreenCaptureError` / `ClipboardError` / `NotifierError` を `any Error` として文字列補間したとき、`main.swift` の `catch { fail("\(error)") }` が生の enum 表現ではなく読める日本語文になることを固定する
 
 ### テスト実行上の注意
 
@@ -146,7 +169,7 @@ Tests/
 
 ### 自動テストしない
 
-- `InteractiveScreenCapturer.capture` と `TerminalNotifier.notify`: どちらも人間の操作か通知センターの目視が要る。README に手動確認手順を残す（読み込み部分の `loadImage` は分離してテストする）
+- `InteractiveScreenCapturer.capture` と `TerminalNotifier.notify`: どちらも人間の操作か通知センターの目視が要る。README に手動確認手順を残す（読み込み部分の `loadImage` は分離してテストする）。`TerminalNotifier` のうち PATH 探索の `locate` は上記のとおり自動テストしており、`swift test` に 6 tests 含まれている。自動テストできないのは実際に `terminal-notifier` プロセスを起動して通知を出す `notify` 本体だけである
 - 傾き・低コントラスト・小さい QR の検出精度: Vision の担当範囲であり、他人の実装を測ることになるため
 
 ## 依存
