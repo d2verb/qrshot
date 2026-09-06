@@ -48,18 +48,17 @@ public struct TerminalNotifier: Notifier {
     public static func locate(
         path: String = ProcessInfo.processInfo.environment["PATH"] ?? ""
     ) -> TerminalNotifier? {
-        // `split` drops empty entries (e.g. from "/a::/b" or a trailing ":"), so unlike POSIX
-        // we never treat an empty PATH entry as "search the current directory". This is
-        // intentional: silently searching the working directory for an external binary would
-        // be unsafe.
+        // `split` は空要素（"/a::/b" や末尾の ":"）を落とすため、POSIX と違って
+        // 空の PATH 要素をカレントディレクトリとして扱わない。これは意図的で、
+        // 外部バイナリをカレントディレクトリから黙って拾うのは危険なため。
         for directory in path.split(separator: ":") {
             let candidate = URL(fileURLWithPath: String(directory))
                 .appendingPathComponent("terminal-notifier")
             var isDirectory: ObjCBool = false
             let exists = FileManager.default.fileExists(
                 atPath: candidate.path, isDirectory: &isDirectory)
-            // `isExecutableFile` alone returns true for directories at mode 0755, which would
-            // let a same-named directory pass the pre-flight check.
+            // `isExecutableFile` だけだと 0755 のディレクトリにも true を返し、
+            // 同名のディレクトリが事前チェックを通過してしまう。
             guard exists, !isDirectory.boolValue else { continue }
             if FileManager.default.isExecutableFile(atPath: candidate.path) {
                 return TerminalNotifier(executableURL: candidate)
