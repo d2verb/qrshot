@@ -1,4 +1,5 @@
 import CoreGraphics
+import Foundation
 import Testing
 
 @testable import QRShotKit
@@ -51,5 +52,28 @@ struct VisionQRDecoderTests {
         let blank = try QRImageFixture.whiteCanvas(width: 200, height: 200)
         let decoded = try await VisionQRDecoder().decode(blank)
         #expect(decoded == nil)
+    }
+
+    @Test("バイナリペイロードの QR だけでは nil を返す")
+    func returnsNilForBinaryOnlyQR() async throws {
+        let binary = try QRImageFixture.qr(Data([0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87]))
+        let decoded = try await VisionQRDecoder().decode(binary)
+        #expect(decoded == nil)
+    }
+
+    @Test("バイナリペイロードの QR が最大でも、読み取れる次の候補を採用する")
+    func skipsUnreadableBinaryQRForNextCandidate() async throws {
+        let big = try QRImageFixture.qr(Data([0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87]), scale: 8)
+        let small = try QRImageFixture.qr("SMALL", scale: 3)
+        let canvas = try QRImageFixture.whiteCanvas(
+            width: 400,
+            height: 240,
+            placing: [(big, CGPoint(x: 8, y: 8)), (small, CGPoint(x: 300, y: 150))]
+        )
+
+        let decoded = try await VisionQRDecoder().decode(canvas)
+
+        #expect(decoded?.payload == "SMALL")
+        #expect(decoded?.detectedCount == 2)
     }
 }

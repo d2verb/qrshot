@@ -10,8 +10,12 @@ struct FixtureError: Error {
 /// テスト内で QR 画像を組み立てる。フィクスチャ画像をリポジトリに置かずに済ませるため。
 enum QRImageFixture {
     static func qr(_ text: String, scale: CGFloat = 8) throws -> CGImage {
+        try qr(Data(text.utf8), scale: scale)
+    }
+
+    static func qr(_ payload: Data, scale: CGFloat = 8) throws -> CGImage {
         let filter = CIFilter.qrCodeGenerator()
-        filter.message = Data(text.utf8)
+        filter.message = payload
         filter.correctionLevel = "M"
         guard let output = filter.outputImage else {
             throw FixtureError(message: "QR を生成できませんでした")

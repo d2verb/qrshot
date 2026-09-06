@@ -18,7 +18,7 @@ public protocol QRDecoder {
     func decode(_ image: CGImage) async throws -> DecodedQR?
 }
 
-/// Vision による実装。面積が最大の QR を優先して採用する。
+/// Vision による実装。バウンディングボックスの面積が最大の QR を優先して採用する。
 public struct VisionQRDecoder: QRDecoder {
     public init() {}
 
