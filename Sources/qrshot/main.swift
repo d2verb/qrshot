@@ -1,7 +1,7 @@
 import Foundation
 import QRShotKit
 
-let version = "0.1.0"
+let version = "0.0.1"
 let usage = """
     qrshot - 画面の領域を選択して、写っている QR コードをクリップボードへコピーします
 
