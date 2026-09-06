@@ -19,11 +19,14 @@ public protocol Notifier {
 
 public enum NotifierError: Error, CustomStringConvertible {
     case launchFailed(String)
+    case exitedNonZero(Int32)
 
     public var description: String {
         switch self {
         case .launchFailed(let reason):
             return "terminal-notifier を実行できませんでした: \(reason)"
+        case .exitedNonZero(let status):
+            return "terminal-notifier が終了コード \(status) で失敗しました"
         }
     }
 }
@@ -45,9 +48,19 @@ public struct TerminalNotifier: Notifier {
     public static func locate(
         path: String = ProcessInfo.processInfo.environment["PATH"] ?? ""
     ) -> TerminalNotifier? {
+        // `split` drops empty entries (e.g. from "/a::/b" or a trailing ":"), so unlike POSIX
+        // we never treat an empty PATH entry as "search the current directory". This is
+        // intentional: silently searching the working directory for an external binary would
+        // be unsafe.
         for directory in path.split(separator: ":") {
             let candidate = URL(fileURLWithPath: String(directory))
                 .appendingPathComponent("terminal-notifier")
+            var isDirectory: ObjCBool = false
+            let exists = FileManager.default.fileExists(
+                atPath: candidate.path, isDirectory: &isDirectory)
+            // `isExecutableFile` alone returns true for directories at mode 0755, which would
+            // let a same-named directory pass the pre-flight check.
+            guard exists, !isDirectory.boolValue else { continue }
             if FileManager.default.isExecutableFile(atPath: candidate.path) {
                 return TerminalNotifier(executableURL: candidate)
             }
@@ -65,5 +78,8 @@ public struct TerminalNotifier: Notifier {
             throw NotifierError.launchFailed(error.localizedDescription)
         }
         process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            throw NotifierError.exitedNonZero(process.terminationStatus)
+        }
     }
 }

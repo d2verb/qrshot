@@ -52,4 +52,26 @@ struct TerminalNotifierLocateTests {
 
         #expect(TerminalNotifier.locate(path: "\(empty.path):\(populated.path)") != nil)
     }
+
+    @Test("実行権限のないファイルは無視する")
+    func ignoresNonExecutableFile() throws {
+        let directory = try makeDirectory(containingExecutable: false)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let binary = directory.appendingPathComponent("terminal-notifier")
+        try Data("#!/bin/sh\n".utf8).write(to: binary)
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: binary.path)
+
+        #expect(TerminalNotifier.locate(path: directory.path) == nil)
+    }
+
+    @Test("同名のディレクトリは無視する")
+    func ignoresDirectoryNamedLikeTheExecutable() throws {
+        let directory = try makeDirectory(containingExecutable: false)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(
+            at: directory.appendingPathComponent("terminal-notifier"),
+            withIntermediateDirectories: true)
+
+        #expect(TerminalNotifier.locate(path: directory.path) == nil)
+    }
 }
