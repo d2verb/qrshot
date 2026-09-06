@@ -120,6 +120,8 @@ Tests/
   - キャンセル時、クリップボードにも通知にも一切触らない
   - 成功時、コピーが 1 回・成功通知が 1 回
   - デコード失敗時、コピーは 0 回・失敗通知が 1 回
+- `InteractiveScreenCapturer.loadImage`: PNG を読み込んだ後に元ファイルを消しても、その `CGImage` からデコードできること
+  - `CGImageSourceCreateWithURL` が返す `CGImage` は画素をファイルから遅延読み込みする。`capture()` は一時ファイルを `defer` で消してから画像を返すため、素朴に書くと QR が写っていても必ず読み取り失敗になる。先に `Data` へ読み切ってファイルの寿命から切り離す
 - `PasteboardClipboard`: `NSPasteboard.withUniqueName()` を注入し、ユーザーの実クリップボードを壊さずに書き込みと読み返しを検証する
   - 前の内容の別形式（HTML など）が残らないこと。`clearContents` を省くと、リッチテキストをコピーした直後の実行で古い内容が貼られてしまう
 
@@ -129,7 +131,7 @@ Tests/
 
 ### 自動テストしない
 
-- `InteractiveScreenCapturer` と `TerminalNotifier.notify`: どちらも人間の操作か通知センターの目視が要る。README に手動確認手順を残す
+- `InteractiveScreenCapturer.capture` と `TerminalNotifier.notify`: どちらも人間の操作か通知センターの目視が要る。README に手動確認手順を残す（読み込み部分の `loadImage` は分離してテストする）
 - 傾き・低コントラスト・小さい QR の検出精度: Vision の担当範囲であり、他人の実装を測ることになるため
 
 ## 依存
