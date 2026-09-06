@@ -27,7 +27,7 @@
 1. `terminal-notifier` が PATH にあるか確認する。無ければ stderr にインストール案内を出して exit 2。キャプチャは開始しない。
 2. `screencapture -i <一時PNG>` を実行する。矩形選択から始まり、スペースキーでウィンドウ選択に切り替わる。シャッター音は無効化しない。
 3. 一時 PNG が生成されなければキャンセルとみなし、何もせず exit 0。
-4. 生成された画像を Vision の `VNDetectBarcodesRequest`（`symbologies = [.qr]`）でデコードする。
+4. 生成された画像を Vision の `DetectBarcodesRequest`（`symbologies = [.qr]`）でデコードする。
 5. デコードできた文字列をクリップボードにコピーし、成功通知を出して exit 0。
 6. デコードできなければ失敗通知を出して exit 1。
 7. どの経路でも一時 PNG は削除する。
@@ -127,7 +127,7 @@ Tests/
 
 - 外部 Swift パッケージ: なし
 - 実行時依存: `terminal-notifier`（`brew install terminal-notifier`）。無い場合はフォールバックせず exit 2 で落ちる
-- プラットフォーム: macOS 14 以上
+- プラットフォーム: macOS 15 以上（Swift ネイティブの `DetectBarcodesRequest` が macOS 15 で導入されたため）
 - テストフレームワーク: Swift Testing（`import Testing`）
 
 ## 検討したが採用しなかった案
@@ -135,4 +135,5 @@ Tests/
 - **ScreenCaptureKit + 自前オーバーレイ**: 見た目を完全に制御できるが実装量とテストコストが大きく、`screencapture -i` がタダで提供する挙動（スペースでウィンドウ選択、Esc でキャンセル、Retina スケール対応）を自前で再実装することになる
 - **`.app` バンドル + `UNUserNotificationCenter`**: 「qrshot」名義の正規な通知が出せるが、Info.plist・ad-hoc 署名・バンドル組み立てスクリプトが必要になり、CLI ツールとしてのビルドと配布が一段複雑になる
 - **CoreImage の `CIDetector(QRCode)`**: 古い API で、傾き・低コントラスト・小さめの QR に明確に弱い。スクリーンショットという荒い入力を扱う以上 Vision のほうが素直
+- **旧 Vision API（`VNDetectBarcodesRequest` + `VNImageRequestHandler`）**: macOS 14 を対象にできる。macOS 26 SDK でも非推奨警告は出ないが、コードが手続き的になる。macOS 15 を切り捨てる実害がないため、async/await の新 API を選んだ
 - **全部 `main.swift` に直書き**: 200 行程度で済むが、テストが実質手動確認のみになる
