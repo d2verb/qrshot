@@ -13,7 +13,7 @@ enum QRImageFixture {
         try qr(Data(text.utf8), scale: scale)
     }
 
-    static func qr(_ payload: Data, scale: CGFloat = 8) throws -> CGImage {
+    static func qr(_ payload: Data, scale: CGFloat) throws -> CGImage {
         let filter = CIFilter.qrCodeGenerator()
         filter.message = payload
         filter.correctionLevel = "M"
