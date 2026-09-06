@@ -45,7 +45,18 @@ public struct InteractiveScreenCapturer: ScreenCapturer {
         // 出力ファイルの有無で判定する。
         guard FileManager.default.fileExists(atPath: url.path) else { return nil }
 
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+        return try Self.loadImage(at: url)
+    }
+
+    /// PNG ファイルを読み込んで `CGImage` にする。
+    ///
+    /// `CGImageSourceCreateWithURL` が返す `CGImage` は画素をファイルから遅延読み込みするため、
+    /// 元ファイルを消すと中身が読めなくなる。capture() は一時ファイルを defer で消してから
+    /// 画像を返すので、先に `Data` へ読み切ってから image source を作り、
+    /// ファイルの寿命から切り離す。
+    static func loadImage(at url: URL) throws -> CGImage {
+        guard let data = try? Data(contentsOf: url),
+              let source = CGImageSourceCreateWithData(data as CFData, nil),
               let image = CGImageSourceCreateImageAtIndex(source, 0, nil)
         else {
             throw ScreenCaptureError.unreadableImage
